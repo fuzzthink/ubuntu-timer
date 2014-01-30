@@ -6,6 +6,7 @@ import time as timelib
 import string
 import math
 import sys
+import pynotify
 
 SEC = 1
 MIN = 60 * SEC
@@ -15,6 +16,8 @@ def menuitem_response(w, buf):
 	print(w, buf)
 
 if __name__ == "__main__":
+
+	pynotify.init("Ubuntu timer")
 
 	# Time in seconds
 	endTime = 0
@@ -59,10 +62,16 @@ if __name__ == "__main__":
 		else:
 			ind.set_label("{minute:02d}:{second:02d}".format(minute=int(minutes), second=int(seconds)))
 
-		if time >= 0:
-			return True
+		if time <= 0:
+			notify("Time is up!")
+			return False
 
-		return False
+		return True
+
+	def notify(str):
+		notification = pynotify.Notification(str, None, "notification-message-im")
+		notification.set_timeout(1000)
+		notification.show()
 
 	def start():
 		global pauseMenuItem, endTime, pauseTime
@@ -87,8 +96,10 @@ if __name__ == "__main__":
 		if pauseTime is not None:
 			endTime += timelib.time() - pauseTime
 			pauseTime = None
+			notify("Timer resumed")
 		else:
 			pauseTime = timelib.time()
+			notify("Timer paused")
 
 		if pauseTime is None:
 			start()
@@ -100,6 +111,8 @@ if __name__ == "__main__":
 	def setTimeMinutes(t):
 		global endTime, MIN
 		endTime = timelib.time() + t * MIN
+
+		notify("Timer set for {0} minutes".format(t))
 
 		start()
 
