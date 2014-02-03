@@ -20,12 +20,17 @@ class UbuntuTimer:
 	# Menu that should be referenceable
 	menu = dict(pause=None, resume=None)
 
+	# Is notifications available
+	notificationsAvailable = False
+
 	# GUI
 	indicator = None
 
-
 	def __init__(self):
-		pynotify.init("ubuntu-timer")
+		"""Setup notifications, and gtk"""
+
+		# Initialize Ubuntu notifications
+		self.notificationsAvailable = pynotify.init("ubuntu-timer")
 
 		self.indicator = appindicator.Indicator ("example-simple-client",
 							"",
@@ -37,10 +42,14 @@ class UbuntuTimer:
 
  		self.createMenu()
 
+ 		self.notify("Hello toast")
+
 		# Start gtk
 		gtk.main()
 
 	def createMenu(self):
+		"""Create the menu"""
+
 		menu = gtk.Menu()
 
 		self.menu['pause'] = gtk.MenuItem("Pause")
@@ -69,6 +78,8 @@ class UbuntuTimer:
 		self.indicator.set_menu(menu)
 
 	def startTimer(self):
+		"""Start the timer and set menu state to running"""
+
 		# Callout with a notification
 		self.notify("Timer started")
 
@@ -81,8 +92,8 @@ class UbuntuTimer:
  		# Disable pause
  		self.pausedAt = None
 
-	# Pause the timer
 	def pause(self, w, buf):
+		"""Pause the timer and show the resume button"""
 
 		# Save timediff now
 		self.pausedAt = self.end - datetime.datetime.now()
@@ -90,8 +101,8 @@ class UbuntuTimer:
 		self.menu['pause'].hide()
 		self.menu['resume'].show()
 		
-	# Resume timer
 	def resume(self, w=None, buf=None):
+		"""Resume the timer and show the pause button"""
 
 		# Add pausedAt timediff and unset
 		self.end = datetime.datetime.now() + self.pausedAt
@@ -102,8 +113,8 @@ class UbuntuTimer:
 
 		self.startTimer()
 
-	# Update timer
 	def update(self):
+		"""Update the timer gtk label"""
 
 		# Check that end and start time exists
 		if self.end is None or self.start is None:
@@ -127,6 +138,8 @@ class UbuntuTimer:
 		return True
 
 	def formatDate(self, start, end):
+		"""Format the timer"""
+
 		# A timediff
 		diff = end - start
 
@@ -138,14 +151,20 @@ class UbuntuTimer:
 		else:
 			return "{minute:02d}:{second:02d}".format(minute=int(minutes), second=int(seconds))
 
-	# Create a notification
 	def notify(self, message):
-		notification = pynotify.Notification(message, None, "notification-message-im")
+		"""Show a ubuntu notification"""
+
+		# Is notifications available?
+		if self.notificationsAvailable is False:
+			return False
+
+		notification = pynotify.Notification(message, None)
 		notification.set_timeout(1000)
 		notification.show()
 
-	# Set number of minutes
 	def setMinutes(self, minutes):
+		"""Set timer for x minutes"""
+
 		self.start = datetime.datetime.now()
 
 		self.end = self.start + datetime.timedelta(minutes=minutes)
@@ -153,6 +172,8 @@ class UbuntuTimer:
 		self.startTimer()
 
 	def quit(self, w, buf):
+		"""Quit the application, usable if running in another shell"""
+
 		sys.exit();
 
 # Program
