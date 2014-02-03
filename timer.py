@@ -121,7 +121,7 @@ class UbuntuTimer:
 	
 		# If time is up
 		if diff.seconds <= 0:
-			notify("Time is up!")
+			self.notify("Time is up!")
 			return False
 
 		return True
