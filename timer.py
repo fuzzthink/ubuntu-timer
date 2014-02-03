@@ -60,6 +60,12 @@ class UbuntuTimer:
 			minutesItem.connect("activate", lambda w, buf, minutes=minutes: self.setMinutes(minutes), "")
 			minutesItem.show()
 
+		# Quit 
+		quitItem = gtk.MenuItem("Quit")
+		menu.append(quitItem)
+		quitItem.connect("activate", self.quit, "Resume")
+		quitItem.show()
+
 		self.indicator.set_menu(menu)
 
 	def startTimer(self):
@@ -145,6 +151,9 @@ class UbuntuTimer:
 		self.end = self.start + datetime.timedelta(minutes=minutes)
 
 		self.startTimer()
+
+	def quit(self, w, buf):
+		sys.exit();
 
 # Program
 timer = UbuntuTimer()
