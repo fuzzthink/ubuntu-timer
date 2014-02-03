@@ -1,172 +1,150 @@
 #!/usr/bin/env python
-import gobject
+#import gobject
 import gtk
 import appindicator
-import time as timelib
 import string
 import math
 import sys
 import pynotify
+import datetime
 
-SEC = 1
-MIN = 60 * SEC
-HOUR = 60 * MIN
+class UbuntuTimer:
+	"""Takes care of time and GUI for the Ubuntu timer"""
 
-def menuitem_response(w, buf):
-	print(w, buf)
+	start = None
+	end = None
 
-if __name__ == "__main__":
+	# This should be a timediff when paused
+	pausedAt = None
 
-	pynotify.init("Ubuntu timer")
+	# Menu that should be referenceable
+	menu = dict(pause=None, resume=None)
 
-	# Time in seconds
-	endTime = 0
-	pauseTime = None
-	paused = False
-	pauseMenuItem = None
+	# GUI
+	indicator = None
 
-	ind = appindicator.Indicator ("example-simple-client",
+
+	def __init__(self):
+		pynotify.init("ubuntu-timer")
+
+		self.indicator = appindicator.Indicator ("example-simple-client",
 							"",
 							appindicator.CATEGORY_APPLICATION_STATUS)
-	ind.set_status (appindicator.STATUS_ACTIVE)
-	ind.set_attention_icon ("indicator-messages-new")
 
-	#help(ind.set_label("Hej"))
-	ind.set_label("00:00")
+		self.indicator.set_status (appindicator.STATUS_ACTIVE)
+		self.indicator.set_attention_icon ("indicator-messages-new")
+		self.indicator.set_label("00:00")
 
-	def update():
-		global endTime, HOUR, MIN, SEC
-		global pauseTime
+ 		self.createMenu()
 
-		time = endTime - timelib.time()
+		# Start gtk
+		gtk.main()
 
-		if pauseTime is not None:
+	def createMenu(self):
+		menu = gtk.Menu()
+
+		self.menu['pause'] = gtk.MenuItem("Pause")
+		menu.append(self.menu['pause'])
+		self.menu['pause'].connect("activate", self.pause, "Pause")
+		#self.menu['pause'].show()
+
+		self.menu['resume'] = gtk.MenuItem("Resume")
+		menu.append(self.menu['resume'])
+		self.menu['resume'].connect("activate", self.resume, "Resume")
+		#self.menu['resume'].show()
+
+		# Create labels for nice timings
+		for minutes in [60, 45, 30, 20, 15, 10, 5, 3]:
+			minutesItem = gtk.MenuItem("{minutes} minutes".format(minutes=minutes))
+			menu.append(minutesItem)
+			minutesItem.connect("activate", lambda w, buf, minutes=minutes: self.setMinutes(minutes), "")
+			minutesItem.show()
+
+		self.indicator.set_menu(menu)
+
+	def startTimer(self):
+		# Callout with a notification
+		self.notify("Timer started")
+
+		# Call every second
+ 		gtk.timeout_add(1000, self.update)
+
+ 		# Add pause button
+ 		self.menu['pause'].show()
+
+ 		# Disable pause
+ 		self.pausedAt = None
+
+	# Pause the timer
+	def pause(self, w, buf):
+
+		# Save timediff now
+		self.pausedAt = self.end - datetime.datetime.now()
+
+		self.menu['pause'].hide()
+		self.menu['resume'].show()
+		
+	# Resume timer
+	def resume(self, w=None, buf=None):
+
+		# Add pausedAt timediff and unset
+		self.end = datetime.datetime.now() + self.pausedAt
+		self.pausedAt = None
+
+		self.menu['resume'].hide()
+		self.menu['pause'].show()
+
+		self.startTimer()
+
+	# Update timer
+	def update(self):
+
+		# Check that end and start time exists
+		if self.end is None or self.start is None:
+			return
+
+		# Check if paused
+		if self.pausedAt is not None:
 			return False
 
-		hours = 0
-		minutes = 0
-		seconds = 0
+		# A timediff
+		diff = self.end - datetime.datetime.now()
 
-		if time >  HOUR-1:
-			hours = time % HOUR
-
-		if time - hours * HOUR > MIN-1:
-			minutes = math.floor((time - hours * HOUR) / MIN);
-
-		if time - hours * HOUR - minutes * MIN > 0:
-			seconds = math.floor(time - hours * HOUR - minutes * MIN / SEC)
-
-		# Format string
-		if hours > 0:
-			ind.set_label("{hour:02d}:{minute:02d}:{second:02d}".format(hour=int(hours), minute=int(minutes), second=int(seconds)))
-		else:
-			ind.set_label("{minute:02d}:{second:02d}".format(minute=int(minutes), second=int(seconds)))
-
-		if time <= 0:
+		# Update label
+		self.indicator.set_label(self.formatDate(datetime.datetime.now(), self.end))
+	
+		# If time is up
+		if diff.seconds <= 0:
 			notify("Time is up!")
 			return False
 
 		return True
 
-	def notify(str):
-		notification = pynotify.Notification(str, None, "notification-message-im")
+	def formatDate(self, start, end):
+		# A timediff
+		diff = end - start
+
+		hours, reminder = divmod(diff.seconds, 3600)
+		minutes, seconds = divmod(reminder, 60)
+
+		if hours > 0:
+			return "{hour:02d}:{minute:02d}:{second:02d}".format(hour=int(hours), minute=int(minutes), second=int(seconds))
+		else:
+			return "{minute:02d}:{second:02d}".format(minute=int(minutes), second=int(seconds))
+
+	# Create a notification
+	def notify(self, message):
+		notification = pynotify.Notification(message, None, "notification-message-im")
 		notification.set_timeout(1000)
 		notification.show()
 
-	def start():
-		global pauseMenuItem, endTime, pauseTime
+	# Set number of minutes
+	def setMinutes(self, minutes):
+		self.start = datetime.datetime.now()
 
-		time = endTime - timelib.time()
+		self.end = self.start + datetime.timedelta(minutes=minutes)
 
-		pauseTime = None
+		self.startTimer()
 
-		if time <= 0:
-			return False
-
-		pauseMenuItem.set_label("Pause")
-
-		# Call every second
-		gtk.timeout_add(1000, update)
-
-		pauseMenuItem.show()
-
-	def pause(w, buf):
-		global pauseTime, pauseMenuItem, endTime
-
-		if pauseTime is not None:
-			endTime += timelib.time() - pauseTime
-			pauseTime = None
-			notify("Timer resumed")
-		else:
-			pauseTime = timelib.time()
-			notify("Timer paused")
-
-		if pauseTime is None:
-			start()
-		else:
-			pauseMenuItem.set_label("Resume")
-
-		return True
-
-	def setTimeMinutes(t):
-		global endTime, MIN
-		endTime = timelib.time() + t * MIN
-
-		notify("Timer set for {0} minutes".format(t))
-
-		start()
-
-	# create a menu
-	menu = gtk.Menu()
- 
- 	item1 = "Start a timer below"
- 	pauseMenuItem = gtk.MenuItem(item1)
- 	menu.append(pauseMenuItem)
- 	pauseMenuItem.connect("activate", pause, item1)
-
- 	item2 = "45 minutes"
- 	menu_items = gtk.MenuItem(item2)
- 	menu.append(menu_items)
- 	menu_items.connect("activate", lambda w, buff: setTimeMinutes(45), item2)
- 	menu_items.show()
-
- 	item3 = "30 minutes"
- 	menu_items = gtk.MenuItem(item3)
- 	menu.append(menu_items)
- 	menu_items.connect("activate", lambda w, buff: setTimeMinutes(30), item3)
- 	menu_items.show()
-
- 	item3 = "15 minutes"
- 	menu_items = gtk.MenuItem(item3)
- 	menu.append(menu_items)
- 	menu_items.connect("activate", lambda w, buff: setTimeMinutes(15), item3)
- 	menu_items.show()
-
- 	item4 = "Quit"
- 	menu_items = gtk.MenuItem(item4)
- 	menu.append(menu_items)
- 	menu_items.connect("activate", lambda w, buff: sys.exit("Closing timer app"), item4)
- 	menu_items.show()
-
-
-	# create some
-	# for i in range(3):
-	# 	buf = "Test-undermenu - %d" % i
- 
-	# 	menu_items = gtk.MenuItem(buf)
- 
-	# 	menu.append(menu_items)
- 
-	# 	# this is where you would connect your menu item up with a function:
- 
-	# 	menu_items.connect("activate", menuitem_response, buf)
- 
-	# 	# show the items
-	# 	menu_items.show()
- 
-	ind.set_menu(menu)
-
-
-	gtk.main()
-
-print("Running")
+# Program
+timer = UbuntuTimer()
