@@ -7,6 +7,7 @@ import math
 import sys
 import pynotify
 import datetime
+import re
 
 class UbuntuTimer:
 	"""Takes care of time and GUI for the Ubuntu timer"""
@@ -62,6 +63,12 @@ class UbuntuTimer:
 		self.menu['resume'].connect("activate", self.resume, "Resume")
 		#self.menu['resume'].show()
 
+		# Custom time
+		inputItem = gtk.MenuItem("Custom")
+		menu.append(inputItem)
+		inputItem.connect("activate", self.promptCustomTimer, "Prompt")
+		inputItem.show()
+
 		# Create labels for nice timings
 		for minutes in [60, 45, 30, 20, 15, 10, 5, 3]:
 			minutesItem = gtk.MenuItem("{minutes} minutes".format(minutes=minutes))
@@ -76,6 +83,51 @@ class UbuntuTimer:
 		quitItem.show()
 
 		self.indicator.set_menu(menu)
+
+	def promptCustomTimer(self, w, buf):
+
+		prompt = gtk.MessageDialog(
+			type=gtk.MESSAGE_QUESTION,
+			buttons=gtk.BUTTONS_OK)
+		prompt.set_markup("Set custom time")
+		prompt.format_secondary_markup("Examples: \n<i>43 min\n2h 3min\n30 minutes\n8m\n38 sec</i>")
+
+		entry = gtk.Entry()
+		entry.set_activates_default(True)
+		entry.connect("activate", lambda str: prompt.emit("response", gtk.RESPONSE_OK))
+
+		prompt.vbox.add(entry)
+		prompt.show_all()
+
+		if prompt.run() != gtk.RESPONSE_OK:
+			rval = ""
+			return False
+		else:
+			rval = entry.get_text()
+
+		prompt.destroy()
+
+		# Get values from string
+		h = re.search('(\d+)\s?(?:h|hour|hour)s?', rval)
+		m = re.search('(\d+)\s?(?:m|min|minute)s?', rval)
+		s = re.search('(\d+)\s?(?:s|sec|second)s?', rval)
+
+		hours = 0
+		minutes = 0
+		seconds = 0
+
+		# Hours
+		if h is not None:
+			hours = int(h.group(1))
+
+		# Minutes
+		if m is not None:
+			minutes = int(m.group(1))
+
+		if s is not None:
+			seconds = int(s.group(1))
+
+		self.setTimer(hours=hours, minutes=minutes, seconds=seconds)
 
 	def startTimer(self):
 		"""Start the timer and set menu state to running"""
@@ -162,14 +214,19 @@ class UbuntuTimer:
 		notification.set_timeout(1000)
 		notification.show()
 
-	def setMinutes(self, minutes):
-		"""Set timer for x minutes"""
+	def setTimer(self, hours=0, minutes=0, seconds=0):
+		"""Set timer"""
 
 		self.start = datetime.datetime.now()
 
-		self.end = self.start + datetime.timedelta(minutes=minutes)
+		self.end = self.start + datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
 
 		self.startTimer()
+
+	def setMinutes(self, minutes):
+		"""Set timer for x minutes"""
+
+		self.setTimer(minutes=minutes)
 
 	def quit(self, w, buf):
 		"""Quit the application, usable if running in another shell"""
